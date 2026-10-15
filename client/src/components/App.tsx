@@ -77,6 +77,11 @@ export function App() {
       onOp: (ops, revision, clientOpId) => doc.onServerOp(ops, revision, clientOpId),
       onCursor: (userId, anchor, head) => doc.onRemoteCursor(userId, anchor, head),
       onPresence: (joined, left) => doc.onPresence(joined, left),
+      onResumed: (revision) => doc.onResumed(revision),
+      onReconnect: () => {
+        doc.beginResume()
+        return doc.resumePoint()
+      },
       onError: (code, message) => console.error(`otter error ${code}: ${message}`),
     })
 
