@@ -338,9 +338,14 @@ Update as work completes.
 | M8 | Multi-instance affinity routing | Optional | designed, deferred |
 | M9 | Document management (CRUD, picker, routing) | **Abhi** | done (Path B) |
 | M10 | OT-visibility UI (selections, op log, state panel) + redesign | **Abhi** | done (Path B) |
-| M11 | Undo / redo (selective, per-user) | **Abhi** | |
+| M11 | Undo / redo (selective, per-user) | **Abhi** | done (Path B) |
 
-**Current focus: M11 (undo/redo — needs a design huddle).** M10 rebuilt the client UI
+**Current focus: deploy + demo (M1–M11 done; M8 optional).** M11 added selective (per-user)
+undo/redo: `Ot.invert`/`invertSequence` in `ot-core` (inverting a delete needs the removed text, so
+inversion takes the pre-state), and client undo/redo stacks of inverse sequences kept in the live
+frame — transformed past every applied op via the renamed `onContentShift` hook (shared with
+cursors), with a typing run coalesced into one undo unit. Ctrl+Z/Shift+Z are wired, suppressing the
+textarea's native undo. M10 rebuilt the client UI
 (free-path, no OT changes): a teal design system with light/dark theming, a two-pane workspace,
 remote **selection** highlights (not just carets), a live append-only **revision-log** panel, and
 a **client-state** panel. Line numbers were deferred (they fight a plain textarea). M9 added
