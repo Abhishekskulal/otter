@@ -1,5 +1,7 @@
 package com.otter.server.session;
 
+import com.otter.ot.Cursor;
+import com.otter.ot.Gravity;
 import com.otter.ot.InvalidOperationException;
 import com.otter.ot.OperationSequence;
 import com.otter.ot.Ot;
@@ -10,8 +12,11 @@ import com.otter.server.persistence.PersistedOperation;
 import com.otter.server.ws.protocol.ErrorCode;
 import com.otter.server.ws.protocol.OperationMapper;
 import com.otter.server.ws.protocol.ServerMessage;
+import com.otter.server.ws.protocol.ServerMessage.Participant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
@@ -35,7 +40,8 @@ public final class DocumentSession {
     private static final Sinks.EmitFailureHandler BUSY_LOOP =
             (signalType, result) -> result == Sinks.EmitResult.FAIL_NON_SERIALIZED;
 
-    private sealed interface Command permits Load, Submit, ReadState {
+    private sealed interface Command
+            permits Load, Submit, ReadState, MemberJoined, MemberLeft, CursorMoved {
     }
 
     private record Load() implements Command {
@@ -47,11 +53,21 @@ public final class DocumentSession {
     private record ReadState(Sinks.One<ServerMessage> reply) implements Command {
     }
 
+    private record MemberJoined(Participant participant) implements Command {
+    }
+
+    private record MemberLeft(UUID userId) implements Command {
+    }
+
+    private record CursorMoved(UUID userId, long baseRevision, int anchor, int head) implements Command {
+    }
+
     private final UUID documentId;
     private final DocumentStore store;
     private final int snapshotInterval;
 
     private final RevisionLog log = new RevisionLog();
+    private final Map<UUID, Participant> participants = new LinkedHashMap<>();
     private final Sinks.Many<Command> mailbox = Sinks.many().unicast().onBackpressureBuffer();
     private final Sinks.Many<ServerMessage> broadcast = Sinks.many().multicast().onBackpressureBuffer();
     private final Disposable pump;
@@ -96,6 +112,24 @@ public final class DocumentSession {
         return reply.asMono();
     }
 
+    /** Registers a member and announces them to everyone else via a presence frame. */
+    public void join(Participant participant) {
+        enqueue(new MemberJoined(participant));
+    }
+
+    /** Removes a member and announces their departure. */
+    public void leave(UUID userId) {
+        enqueue(new MemberLeft(userId));
+    }
+
+    /**
+     * Relays a member's caret: transforms it from {@code baseRevision} up to the current revision
+     * using the history already held, then fans it out in the server's revision frame.
+     */
+    public void moveCursor(UUID userId, long baseRevision, int anchor, int head) {
+        enqueue(new CursorMoved(userId, baseRevision, anchor, head));
+    }
+
     public void dispose() {
         broadcast.tryEmitComplete();
         mailbox.tryEmitComplete();
@@ -121,7 +155,44 @@ public final class DocumentSession {
                 yield Mono.empty();
             }
             case Submit submit -> handleSubmit(submit);
+            case MemberJoined joined -> {
+                participants.put(joined.participant().userId(), joined.participant());
+                broadcast.tryEmitNext(new ServerMessage.Presence(
+                        documentId, List.of(joined.participant()), List.of()));
+                yield Mono.empty();
+            }
+            case MemberLeft left -> {
+                if (participants.remove(left.userId()) != null) {
+                    broadcast.tryEmitNext(new ServerMessage.Presence(
+                            documentId, List.of(), List.of(left.userId())));
+                }
+                yield Mono.empty();
+            }
+            case CursorMoved moved -> {
+                handleCursor(moved);
+                yield Mono.empty();
+            }
         };
+    }
+
+    private void handleCursor(CursorMoved moved) {
+        if (loadError != null) {
+            return;
+        }
+        Cursor cursor = new Cursor(Math.max(0, moved.anchor()), Math.max(0, moved.head()));
+        long base = moved.baseRevision();
+        if (base >= log.oldestRetainedRevision() && base < log.currentRevision()) {
+            for (OperationSequence concurrent : log.since(base)) {
+                cursor = Ot.transform(cursor, concurrent, Gravity.RIGHT);
+            }
+        }
+        int limit = content.length();
+        broadcast.tryEmitNext(new ServerMessage.Cursor(
+                documentId,
+                moved.userId(),
+                log.currentRevision(),
+                Math.min(cursor.anchor(), limit),
+                Math.min(cursor.head(), limit)));
     }
 
     private void applyLoad(LoadedDocument document) {
@@ -208,7 +279,8 @@ public final class DocumentSession {
     }
 
     private ServerMessage syncMessage() {
-        return new ServerMessage.Sync(documentId, log.currentRevision(), content, List.of());
+        return new ServerMessage.Sync(
+                documentId, log.currentRevision(), content, List.copyOf(participants.values()));
     }
 
     private ServerMessage.Op opMessage(RevisionLog.Entry entry) {
