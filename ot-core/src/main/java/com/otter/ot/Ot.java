@@ -144,6 +144,61 @@ public final class Ot {
         return normalize(ops);
     }
 
+    /**
+     * Shifts a gap position so it points at the same place in the document after {@code op} is
+     * applied. An insert before the position moves it right by the inserted length; a delete before
+     * it moves it left by the removed length; a delete straddling it collapses it to the cut point.
+     * {@code gravity} decides only the case where an insert lands exactly on the position.
+     */
+    public static int transformPosition(int position, Operation op, Gravity gravity) {
+        return switch (op) {
+            case NoOp ignored -> position;
+            case Insert insert -> {
+                int at = insert.position();
+                int length = insert.text().length();
+                if (at < position) {
+                    yield position + length;
+                }
+                if (at > position) {
+                    yield position;
+                }
+                yield gravity == Gravity.RIGHT ? position + length : position;
+            }
+            case Delete delete -> {
+                int start = delete.position();
+                int end = start + delete.length();
+                if (position <= start) {
+                    yield position;
+                }
+                if (position >= end) {
+                    yield position - delete.length();
+                }
+                yield start;
+            }
+        };
+    }
+
+    /** Shifts a position forward through every operation of {@code sequence}, in order. */
+    public static int transformPosition(int position, OperationSequence sequence, Gravity gravity) {
+        int result = position;
+        for (Operation op : sequence.operations()) {
+            result = transformPosition(result, op, gravity);
+        }
+        return result;
+    }
+
+    public static Cursor transform(Cursor cursor, Operation op, Gravity gravity) {
+        return new Cursor(
+                transformPosition(cursor.anchor(), op, gravity),
+                transformPosition(cursor.head(), op, gravity));
+    }
+
+    public static Cursor transform(Cursor cursor, OperationSequence sequence, Gravity gravity) {
+        return new Cursor(
+                transformPosition(cursor.anchor(), sequence, gravity),
+                transformPosition(cursor.head(), sequence, gravity));
+    }
+
     private static OperationSequence normalize(List<Operation> ops) {
         List<Operation> out = new ArrayList<>();
         for (Operation op : ops) {
