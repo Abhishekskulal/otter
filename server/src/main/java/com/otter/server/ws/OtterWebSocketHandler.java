@@ -86,7 +86,9 @@ public final class OtterWebSocketHandler implements WebSocketHandler {
             case ClientMessage.Join join -> {
                 memberships.computeIfAbsent(join.documentId(), docId -> {
                     DocumentSession ds = registry.join(docId);
-                    Disposable subscription = ds.broadcast().subscribe(outbound::tryEmitNext);
+                    Disposable subscription = ds.broadcast()
+                            .filter(frame -> !isOwnCursor(frame, authorId))
+                            .subscribe(outbound::tryEmitNext);
                     ds.join(identity);
                     ds.currentState().subscribe(outbound::tryEmitNext);
                     return new Membership(ds, subscription);
@@ -120,6 +122,11 @@ public final class OtterWebSocketHandler implements WebSocketHandler {
                 }
             }
         }
+    }
+
+    /** A client never needs its own caret echoed back to it. */
+    private static boolean isOwnCursor(ServerMessage message, UUID authorId) {
+        return message instanceof ServerMessage.Cursor cursor && cursor.userId().equals(authorId);
     }
 
     private String serialize(ServerMessage message) {
