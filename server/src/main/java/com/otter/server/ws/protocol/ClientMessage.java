@@ -10,14 +10,20 @@ import java.util.UUID;
         @JsonSubTypes.Type(value = ClientMessage.Join.class, name = "join"),
         @JsonSubTypes.Type(value = ClientMessage.Leave.class, name = "leave"),
         @JsonSubTypes.Type(value = ClientMessage.Op.class, name = "op"),
-        @JsonSubTypes.Type(value = ClientMessage.Cursor.class, name = "cursor")
+        @JsonSubTypes.Type(value = ClientMessage.Cursor.class, name = "cursor"),
+        @JsonSubTypes.Type(value = ClientMessage.Resume.class, name = "resume")
 })
 public sealed interface ClientMessage
-        permits ClientMessage.Join, ClientMessage.Leave, ClientMessage.Op, ClientMessage.Cursor {
+        permits ClientMessage.Join, ClientMessage.Leave, ClientMessage.Op,
+                ClientMessage.Cursor, ClientMessage.Resume {
 
     UUID documentId();
 
     record Join(UUID documentId) implements ClientMessage {
+    }
+
+    /** Reconnect catch-up request: replay everything committed after {@code afterRevision}. */
+    record Resume(UUID documentId, long afterRevision) implements ClientMessage {
     }
 
     record Leave(UUID documentId) implements ClientMessage {
