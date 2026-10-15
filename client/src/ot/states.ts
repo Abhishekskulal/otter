@@ -24,6 +24,8 @@ export interface OtState {
   applyLocal(ctx: DocumentContext, op: Operation): OtState
   applyRemote(ctx: DocumentContext, ops: OperationSequence, revision: number): OtState
   applyAck(ctx: DocumentContext, revision: number): OtState
+  /** Re-transmits the in-flight op after a reconnect, rebased onto the caught-up revision. */
+  resend(ctx: DocumentContext): void
 }
 
 export class Synchronized implements OtState {
@@ -51,6 +53,10 @@ export class Synchronized implements OtState {
 
   applyAck(): OtState {
     throw new Error('Acknowledgement received while synchronized with nothing in flight')
+  }
+
+  resend(): void {
+    // Nothing is in flight, so there is nothing to retransmit.
   }
 }
 
@@ -81,6 +87,10 @@ export class AwaitingAck implements OtState {
   applyAck(ctx: DocumentContext, revision: number): OtState {
     ctx.setRevision(revision)
     return new Synchronized()
+  }
+
+  resend(ctx: DocumentContext): void {
+    ctx.send(this.inFlight, ctx.revision, this.pendingClientOpId)
   }
 }
 
@@ -119,5 +129,9 @@ export class AwaitingWithBuffer implements OtState {
     const clientOpId = ctx.newClientOpId()
     ctx.send(this.buffer, revision, clientOpId)
     return new AwaitingAck(this.buffer, clientOpId)
+  }
+
+  resend(ctx: DocumentContext): void {
+    ctx.send(this.inFlight, ctx.revision, this.pendingClientOpId)
   }
 }
