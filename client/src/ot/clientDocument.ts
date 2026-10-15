@@ -1,6 +1,12 @@
-import { type Cursor, transformCursor } from './engine'
+import { type Cursor, invertSequence, transformCursor, transformSequence } from './engine'
 import type { Operation, OperationSequence } from './operation'
 import { type DocumentContext, type OtState, Synchronized } from './states'
+
+interface UndoUnit {
+  forward: Operation[]
+  before: string
+  kind: 'insert' | 'delete'
+}
 
 export interface RemoteParticipant {
   readonly userId: string
@@ -32,6 +38,10 @@ export class ClientDocument implements DocumentContext {
   private state: OtState = new Synchronized()
   /** True from a reconnect until the pending op is transmitted over the live socket, so it is re-sent once. */
   private needsRetransmit = false
+  /** Undo/redo entries are inverse sequences kept in the live frame; the open unit coalesces a typing run. */
+  private undoStack: OperationSequence[] = []
+  private redoStack: OperationSequence[] = []
+  private openUnit: UndoUnit | null = null
 
   constructor(private readonly options: ClientDocumentOptions) {
     this.content = options.content ?? ''
@@ -46,11 +56,13 @@ export class ClientDocument implements DocumentContext {
     this.revision = revision
   }
 
-  /** Any op applied to the displayed text drags every remote caret along with it. */
-  shiftCursors(applied: OperationSequence): void {
+  /** Any op applied to the displayed text drags remote carets and the undo/redo stacks along with it. */
+  onContentShift(applied: OperationSequence): void {
     for (const [userId, cursor] of this.remoteCursors) {
       this.remoteCursors.set(userId, this.clamp(transformCursor(cursor, applied, 'right')))
     }
+    this.undoStack = this.undoStack.map((entry) => transformSequence(entry, applied).aPrime)
+    this.redoStack = this.redoStack.map((entry) => transformSequence(entry, applied).aPrime)
   }
 
   send(ops: OperationSequence, baseRevision: number, clientOpId: string): void {
@@ -64,6 +76,7 @@ export class ClientDocument implements DocumentContext {
   }
 
   localEdit(op: Operation): void {
+    this.recordForUndo(op)
     this.state = this.state.applyLocal(this, op)
     this.options.onChange()
   }
@@ -112,12 +125,71 @@ export class ClientDocument implements DocumentContext {
     if (clientOpId === this.state.pendingClientOpId) {
       this.state = this.state.applyAck(this, revision)
     } else if (revision > this.revision) {
+      this.sealOpenUnit() // a remote edit ends the current typing run
       this.state = this.state.applyRemote(this, ops, revision)
     } else {
       // Already applied — a reconnect replay overlapping ops delivered live. Ignore the duplicate.
       return
     }
     this.options.onChange()
+  }
+
+  // ---- undo / redo: selective (per-user), stacks kept in the live frame ----
+
+  undo(): void {
+    this.sealOpenUnit()
+    const inverse = this.undoStack.pop()
+    if (!inverse) return
+    const redoEntry = invertSequence(inverse, this.content)
+    this.applyInternal(inverse)
+    this.redoStack.push(redoEntry)
+    this.options.onChange()
+  }
+
+  redo(): void {
+    this.sealOpenUnit()
+    const forward = this.redoStack.pop()
+    if (!forward) return
+    const undoEntry = invertSequence(forward, this.content)
+    this.applyInternal(forward)
+    this.undoStack.push(undoEntry)
+    this.options.onChange()
+  }
+
+  canUndo(): boolean {
+    return this.undoStack.length > 0 || this.openUnit !== null
+  }
+
+  canRedo(): boolean {
+    return this.redoStack.length > 0
+  }
+
+  /** Applies a sequence through the state machine as a normal edit, without recording it for undo. */
+  private applyInternal(sequence: OperationSequence): void {
+    for (const op of sequence) {
+      this.state = this.state.applyLocal(this, op)
+    }
+  }
+
+  /** Folds a user edit into the open undo unit, or starts a new one; a fresh edit discards redo. */
+  private recordForUndo(op: Operation): void {
+    if (op.kind === 'noop') return
+    this.redoStack = []
+    if (this.openUnit && this.openUnit.kind === op.kind && continues(this.openUnit, op)) {
+      this.openUnit.forward.push(op)
+    } else {
+      this.sealOpenUnit()
+      this.openUnit = { forward: [op], before: this.content, kind: op.kind }
+    }
+  }
+
+  private sealOpenUnit(): void {
+    if (!this.openUnit) return
+    const inverse = invertSequence(this.openUnit.forward, this.openUnit.before)
+    if (inverse.length > 0) {
+      this.undoStack.push(inverse)
+    }
+    this.openUnit = null
   }
 
   /** Marks the pending op for retransmission; called when the socket reconnects, before replay. */
@@ -145,4 +217,16 @@ export class ClientDocument implements DocumentContext {
   stateName(): string {
     return this.state.constructor.name
   }
+}
+
+/** Whether `op` continues an uninterrupted typing run: adjacent inserts, or adjacent deletes/backspaces. */
+function continues(unit: UndoUnit, op: Operation): boolean {
+  const last = unit.forward[unit.forward.length - 1]
+  if (last.kind === 'insert' && op.kind === 'insert') {
+    return op.position === last.position + last.text.length
+  }
+  if (last.kind === 'delete' && op.kind === 'delete') {
+    return op.position === last.position || op.position + op.length === last.position
+  }
+  return false
 }

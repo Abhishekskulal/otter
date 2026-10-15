@@ -12,8 +12,8 @@ export interface DocumentContext {
   setRevision(revision: number): void
   send(ops: OperationSequence, baseRevision: number, clientOpId: string): void
   newClientOpId(): string
-  /** Notifies the context that `applied` was just applied to the displayed text, so carets can follow. */
-  shiftCursors(applied: OperationSequence): void
+  /** Notifies the context that `applied` hit the displayed text, so carets and undo stacks can follow it. */
+  onContentShift(applied: OperationSequence): void
 }
 
 export interface OtState {
@@ -37,7 +37,7 @@ export class Synchronized implements OtState {
 
   applyLocal(ctx: DocumentContext, op: Operation): OtState {
     ctx.setContent(apply(ctx.content, op))
-    ctx.shiftCursors([op])
+    ctx.onContentShift([op])
     const clientOpId = ctx.newClientOpId()
     const inFlight: OperationSequence = [op]
     ctx.send(inFlight, ctx.revision, clientOpId)
@@ -46,7 +46,7 @@ export class Synchronized implements OtState {
 
   applyRemote(ctx: DocumentContext, ops: OperationSequence, revision: number): OtState {
     ctx.setContent(applySequence(ctx.content, ops))
-    ctx.shiftCursors(ops)
+    ctx.onContentShift(ops)
     ctx.setRevision(revision)
     return this
   }
@@ -72,14 +72,14 @@ export class AwaitingAck implements OtState {
 
   applyLocal(ctx: DocumentContext, op: Operation): OtState {
     ctx.setContent(apply(ctx.content, op))
-    ctx.shiftCursors([op])
+    ctx.onContentShift([op])
     return new AwaitingWithBuffer(this.inFlight, this.pendingClientOpId, [op])
   }
 
   applyRemote(ctx: DocumentContext, ops: OperationSequence, revision: number): OtState {
     const { aPrime, bPrime } = transformSequence(this.inFlight, ops)
     ctx.setContent(applySequence(ctx.content, bPrime))
-    ctx.shiftCursors(bPrime)
+    ctx.onContentShift(bPrime)
     ctx.setRevision(revision)
     return new AwaitingAck(aPrime, this.pendingClientOpId)
   }
@@ -107,7 +107,7 @@ export class AwaitingWithBuffer implements OtState {
 
   applyLocal(ctx: DocumentContext, op: Operation): OtState {
     ctx.setContent(apply(ctx.content, op))
-    ctx.shiftCursors([op])
+    ctx.onContentShift([op])
     return new AwaitingWithBuffer(this.inFlight, this.pendingClientOpId, compose(this.buffer, op))
   }
 
@@ -115,7 +115,7 @@ export class AwaitingWithBuffer implements OtState {
     const againstInFlight = transformSequence(this.inFlight, ops)
     const againstBuffer = transformSequence(this.buffer, againstInFlight.bPrime)
     ctx.setContent(applySequence(ctx.content, againstBuffer.bPrime))
-    ctx.shiftCursors(againstBuffer.bPrime)
+    ctx.onContentShift(againstBuffer.bPrime)
     ctx.setRevision(revision)
     return new AwaitingWithBuffer(
       againstInFlight.aPrime,
