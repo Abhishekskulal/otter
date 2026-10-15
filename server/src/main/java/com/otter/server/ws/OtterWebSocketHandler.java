@@ -32,9 +32,16 @@ public final class OtterWebSocketHandler implements WebSocketHandler {
         this.objectMapper = objectMapper;
     }
 
+    /** Distinct colours handed to members in join order; wraps around past the end. */
+    private static final String[] PALETTE = {
+            "#e6194B", "#3cb44b", "#4363d8", "#f58231", "#911eb4",
+            "#42d4f4", "#f032e6", "#bfef45", "#fabed4", "#469990"
+    };
+
     @Override
     public Mono<Void> handle(WebSocketSession session) {
-        UUID authorId = UUID.randomUUID();
+        ServerMessage.Participant identity = newIdentity();
+        UUID authorId = identity.userId();
         Sinks.Many<ServerMessage> outbound = Sinks.many().unicast().onBackpressureBuffer();
         Map<UUID, Membership> memberships = new ConcurrentHashMap<>();
 
@@ -43,9 +50,10 @@ public final class OtterWebSocketHandler implements WebSocketHandler {
 
         Mono<Void> receive = session.receive()
                 .map(WebSocketMessage::getPayloadAsText)
-                .doOnNext(text -> dispatch(text, authorId, outbound, memberships))
+                .doOnNext(text -> dispatch(text, identity, outbound, memberships))
                 .doFinally(signal -> {
                     memberships.forEach((docId, m) -> {
+                        m.session().leave(authorId);
                         m.subscription().dispose();
                         registry.leave(docId);
                     });
@@ -57,8 +65,16 @@ public final class OtterWebSocketHandler implements WebSocketHandler {
         return Mono.zip(send, receive).then();
     }
 
-    private void dispatch(String text, UUID authorId, Sinks.Many<ServerMessage> outbound,
+    private static ServerMessage.Participant newIdentity() {
+        UUID userId = UUID.randomUUID();
+        String shortId = userId.toString().substring(0, 4);
+        String colour = PALETTE[Math.floorMod(userId.hashCode(), PALETTE.length)];
+        return new ServerMessage.Participant(userId, "Anon-" + shortId, colour);
+    }
+
+    private void dispatch(String text, ServerMessage.Participant identity, Sinks.Many<ServerMessage> outbound,
             Map<UUID, Membership> memberships) {
+        UUID authorId = identity.userId();
         ClientMessage message;
         try {
             message = objectMapper.readValue(text, ClientMessage.class);
@@ -71,6 +87,7 @@ public final class OtterWebSocketHandler implements WebSocketHandler {
                 memberships.computeIfAbsent(join.documentId(), docId -> {
                     DocumentSession ds = registry.join(docId);
                     Disposable subscription = ds.broadcast().subscribe(outbound::tryEmitNext);
+                    ds.join(identity);
                     ds.currentState().subscribe(outbound::tryEmitNext);
                     return new Membership(ds, subscription);
                 });
@@ -78,6 +95,7 @@ public final class OtterWebSocketHandler implements WebSocketHandler {
             case ClientMessage.Leave leave -> {
                 Membership m = memberships.remove(leave.documentId());
                 if (m != null) {
+                    m.session().leave(authorId);
                     m.subscription().dispose();
                     registry.leave(leave.documentId());
                 }
@@ -94,6 +112,12 @@ public final class OtterWebSocketHandler implements WebSocketHandler {
                         op.baseRevision(),
                         OperationMapper.toDomain(op.ops()));
                 m.session().submit(envelope).subscribe(outbound::tryEmitNext);
+            }
+            case ClientMessage.Cursor cursor -> {
+                Membership m = memberships.get(cursor.documentId());
+                if (m != null) {
+                    m.session().moveCursor(authorId, cursor.baseRevision(), cursor.anchor(), cursor.head());
+                }
             }
         }
     }
