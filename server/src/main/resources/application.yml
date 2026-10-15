@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: otter
+  r2dbc:
+    url: ${OTTER_R2DBC_URL:r2dbc:postgresql://localhost:5432/otter}
+    username: ${OTTER_DB_USER:otter}
+    password: ${OTTER_DB_PASSWORD:otter}
+  flyway:
+    url: ${OTTER_JDBC_URL:jdbc:postgresql://localhost:5432/otter}
+    user: ${OTTER_DB_USER:otter}
+    password: ${OTTER_DB_PASSWORD:otter}
+    locations: classpath:db/migration
+
+otter:
+  # Capture a snapshot every N committed operations (§7.2). Loading folds the newest snapshot
+  # plus the operations after it, bounding replay cost and storage.
+  snapshot-interval: 500
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
