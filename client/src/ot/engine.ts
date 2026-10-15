@@ -185,3 +185,34 @@ export function transformCursor(cursor: Cursor, ops: OperationSequence, gravity:
     head: transformPositionSequence(cursor.head, ops, gravity),
   }
 }
+
+/** The operation that undoes `op`; inverting a delete needs the text it removed, so pass the pre-state. */
+export function invert(op: Operation, stateBefore: string): Operation {
+  switch (op.kind) {
+    case 'noop':
+      return op
+    case 'insert':
+      return del(op.position, op.text.length)
+    case 'delete': {
+      const end = op.position + op.length
+      if (end > stateBefore.length) {
+        throw new Error(`Cannot invert delete @${op.position}+${op.length} for length ${stateBefore.length}`)
+      }
+      return insert(op.position, stateBefore.slice(op.position, end))
+    }
+  }
+}
+
+export function invertSequence(sequence: OperationSequence, stateBefore: string): OperationSequence {
+  const preStates: string[] = []
+  let state = stateBefore
+  for (const op of sequence) {
+    preStates.push(state)
+    state = apply(state, op)
+  }
+  const inverse: Operation[] = []
+  for (let i = sequence.length - 1; i >= 0; i--) {
+    inverse.push(invert(sequence[i], preStates[i]))
+  }
+  return inverse
+}
