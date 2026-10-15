@@ -9,9 +9,11 @@ import java.util.UUID;
 @JsonSubTypes({
         @JsonSubTypes.Type(value = ClientMessage.Join.class, name = "join"),
         @JsonSubTypes.Type(value = ClientMessage.Leave.class, name = "leave"),
-        @JsonSubTypes.Type(value = ClientMessage.Op.class, name = "op")
+        @JsonSubTypes.Type(value = ClientMessage.Op.class, name = "op"),
+        @JsonSubTypes.Type(value = ClientMessage.Cursor.class, name = "cursor")
 })
-public sealed interface ClientMessage permits ClientMessage.Join, ClientMessage.Leave, ClientMessage.Op {
+public sealed interface ClientMessage
+        permits ClientMessage.Join, ClientMessage.Leave, ClientMessage.Op, ClientMessage.Cursor {
 
     UUID documentId();
 
@@ -23,5 +25,9 @@ public sealed interface ClientMessage permits ClientMessage.Join, ClientMessage.
 
     record Op(UUID documentId, UUID clientOpId, long baseRevision, List<WireOp> ops)
             implements ClientMessage {
+    }
+
+    /** The sender's caret, expressed against the revision its positions were measured in. */
+    record Cursor(UUID documentId, long baseRevision, int anchor, int head) implements ClientMessage {
     }
 }
