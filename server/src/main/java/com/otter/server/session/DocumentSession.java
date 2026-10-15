@@ -41,7 +41,7 @@ public final class DocumentSession {
             (signalType, result) -> result == Sinks.EmitResult.FAIL_NON_SERIALIZED;
 
     private sealed interface Command
-            permits Load, Submit, ReadState, MemberJoined, MemberLeft, CursorMoved {
+            permits Load, Submit, ReadState, Resume, MemberJoined, MemberLeft, CursorMoved {
     }
 
     private record Load() implements Command {
@@ -51,6 +51,9 @@ public final class DocumentSession {
     }
 
     private record ReadState(Sinks.One<ServerMessage> reply) implements Command {
+    }
+
+    private record Resume(long afterRevision, Sinks.One<List<ServerMessage>> reply) implements Command {
     }
 
     private record MemberJoined(Participant participant) implements Command {
@@ -112,6 +115,16 @@ public final class DocumentSession {
         return reply.asMono();
     }
 
+    /**
+     * Replays everything committed after {@code afterRevision} for a reconnecting client, ending with
+     * a {@code resumed} marker — or a single full {@code sync} when that revision predates retained history.
+     */
+    public Mono<List<ServerMessage>> resume(long afterRevision) {
+        Sinks.One<List<ServerMessage>> reply = Sinks.one();
+        enqueue(new Resume(afterRevision, reply));
+        return reply.asMono();
+    }
+
     /** Registers a member and announces them to everyone else via a presence frame. */
     public void join(Participant participant) {
         enqueue(new MemberJoined(participant));
@@ -155,6 +168,10 @@ public final class DocumentSession {
                 yield Mono.empty();
             }
             case Submit submit -> handleSubmit(submit);
+            case Resume resume -> {
+                resume.reply().tryEmitValue(buildResume(resume.afterRevision()));
+                yield Mono.empty();
+            }
             case MemberJoined joined -> {
                 participants.put(joined.participant().userId(), joined.participant());
                 broadcast.tryEmitNext(new ServerMessage.Presence(
@@ -173,6 +190,22 @@ public final class DocumentSession {
                 yield Mono.empty();
             }
         };
+    }
+
+    private List<ServerMessage> buildResume(long afterRevision) {
+        if (loadError != null) {
+            return List.of(error(ErrorCode.PERSISTENCE_FAILURE, loadError));
+        }
+        // Beyond the retained window (or nonsensical): the client cannot catch up incrementally.
+        if (afterRevision < log.oldestRetainedRevision() || afterRevision > log.currentRevision()) {
+            return List.of(syncMessage());
+        }
+        List<ServerMessage> frames = new ArrayList<>();
+        for (RevisionLog.Entry entry : log.entriesSince(afterRevision)) {
+            frames.add(opMessage(entry));
+        }
+        frames.add(new ServerMessage.Resumed(documentId, log.currentRevision()));
+        return frames;
     }
 
     private void handleCursor(CursorMoved moved) {

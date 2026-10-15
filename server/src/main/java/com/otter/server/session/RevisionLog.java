@@ -78,4 +78,13 @@ public final class RevisionLog {
         }
         return result;
     }
+
+    /** The full entries committed after {@code fromRevision} — the reconnect replay feed. */
+    public List<Entry> entriesSince(long fromRevision) {
+        if (fromRevision >= currentRevision) {
+            return Collections.emptyList();
+        }
+        int start = (int) (fromRevision - baseRevision);
+        return new ArrayList<>(entries.subList(start, entries.size()));
+    }
 }
