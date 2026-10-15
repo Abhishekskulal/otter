@@ -337,10 +337,14 @@ Update as work completes.
 | M7 | Reconnection with op replay | **Abhi** | done (Path B) |
 | M8 | Multi-instance affinity routing | Optional | designed, deferred |
 | M9 | Document management (CRUD, picker, routing) | **Abhi** | done (Path B) |
-| M10 | OT-visibility UI (selections, op log, state panel) + redesign | **Abhi** | |
+| M10 | OT-visibility UI (selections, op log, state panel) + redesign | **Abhi** | done (Path B) |
 | M11 | Undo / redo (selective, per-user) | **Abhi** | |
 
-**Current focus: M10.** M9 added document management: a reactive REST API under `api/`
+**Current focus: M11 (undo/redo — needs a design huddle).** M10 rebuilt the client UI
+(free-path, no OT changes): a teal design system with light/dark theming, a two-pane workspace,
+remote **selection** highlights (not just carets), a live append-only **revision-log** panel, and
+a **client-state** panel. Line numbers were deferred (they fight a plain textarea). M9 added
+document management: a reactive REST API under `api/`
 (create/list/get/rename) with CORS, and a client that routes between a document picker (`/`) and
 the editor (`/d/<id>`), with editable titles — no OT-core changes. M8 is designed but deferred.
 M2–M7 are done (Path B). M7 added reconnection:
