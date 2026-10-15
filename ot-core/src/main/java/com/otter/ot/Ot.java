@@ -199,6 +199,42 @@ public final class Ot {
                 transformPosition(cursor.head(), sequence, gravity));
     }
 
+    /**
+     * The operation that exactly undoes {@code op} when applied to {@code apply(stateBefore, op)}.
+     * Inverting a delete needs the removed characters, which only exist in the state before it ran —
+     * hence {@code stateBefore}. The relation is {@code apply(apply(s, op), invert(op, s)) == s}.
+     */
+    public static Operation invert(Operation op, String stateBefore) {
+        return switch (op) {
+            case NoOp noOp -> noOp;
+            case Insert insert -> new Delete(insert.position(), insert.text().length());
+            case Delete delete -> {
+                int end = delete.position() + delete.length();
+                if (end > stateBefore.length()) {
+                    throw new InvalidOperationException(
+                            "Cannot invert " + delete + " against state length " + stateBefore.length());
+                }
+                yield new Insert(delete.position(), stateBefore.substring(delete.position(), end));
+            }
+        };
+    }
+
+    /** Inverts a sequence: each operation inverted against its own pre-state, then applied in reverse. */
+    public static OperationSequence invert(OperationSequence sequence, String stateBefore) {
+        List<Operation> ops = sequence.operations();
+        List<String> preStates = new ArrayList<>(ops.size());
+        String state = stateBefore;
+        for (Operation op : ops) {
+            preStates.add(state);
+            state = apply(state, op);
+        }
+        List<Operation> inverse = new ArrayList<>(ops.size());
+        for (int i = ops.size() - 1; i >= 0; i--) {
+            inverse.add(invert(ops.get(i), preStates.get(i)));
+        }
+        return new OperationSequence(inverse);
+    }
+
     private static OperationSequence normalize(List<Operation> ops) {
         List<Operation> out = new ArrayList<>();
         for (Operation op : ops) {

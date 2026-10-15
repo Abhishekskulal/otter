@@ -76,4 +76,27 @@ class OtProperties {
         assertThatCode(() -> Ot.apply(applicable.state(), applicable.op()))
                 .doesNotThrowAnyException();
     }
+
+    @Property
+    void invertingAnOperationRestoresTheState(@ForAll("applicableOps") Generators.ApplicableOp applicable) {
+        String after = Ot.apply(applicable.state(), applicable.op());
+        Operation inverse = Ot.invert(applicable.op(), applicable.state());
+        assertThat(Ot.apply(after, inverse)).isEqualTo(applicable.state());
+    }
+
+    @Provide
+    Arbitrary<SequenceCase> sequenceCases() {
+        return Generators.documents()
+                .flatMap(state -> Generators.sequenceValidFor(state).map(seq -> new SequenceCase(state, seq)));
+    }
+
+    record SequenceCase(String state, OperationSequence sequence) {
+    }
+
+    @Property
+    void invertingASequenceRestoresTheState(@ForAll("sequenceCases") SequenceCase scenario) {
+        String after = Ot.apply(scenario.state(), scenario.sequence());
+        OperationSequence inverse = Ot.invert(scenario.sequence(), scenario.state());
+        assertThat(Ot.apply(after, inverse)).isEqualTo(scenario.state());
+    }
 }
