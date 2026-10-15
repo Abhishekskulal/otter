@@ -49,6 +49,8 @@ export function Editor({ documentId, onBack }: { documentId: string; onBack: () 
   const [participants, setParticipants] = useState<RemoteParticipant[]>([])
   const [log, setLog] = useState<LogEntry[]>([])
   const [title, setTitle] = useState('Untitled')
+  const [canUndo, setCanUndo] = useState(false)
+  const [canRedo, setCanRedo] = useState(false)
   const docRef = useRef<ClientDocument | null>(null)
   const areaRef = useRef<HTMLTextAreaElement | null>(null)
   const mirrorRef = useRef<HTMLDivElement | null>(null)
@@ -67,6 +69,8 @@ export function Editor({ documentId, onBack }: { documentId: string; onBack: () 
         setStateName(doc.stateName())
         setCursors(decorations(doc))
         setParticipants([...doc.participants.values()])
+        setCanUndo(doc.canUndo())
+        setCanRedo(doc.canRedo())
       },
       newClientOpId: () => crypto.randomUUID(),
     })
@@ -107,6 +111,20 @@ export function Editor({ documentId, onBack }: { documentId: string; onBack: () 
     sendCaret()
   }
 
+  // Route Ctrl/Cmd+Z and Shift+Z (or Ctrl+Y) to OT undo/redo, suppressing the textarea's native undo.
+  const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const mod = event.ctrlKey || event.metaKey
+    const key = event.key.toLowerCase()
+    if (mod && key === 'z') {
+      event.preventDefault()
+      if (event.shiftKey) docRef.current?.redo()
+      else docRef.current?.undo()
+    } else if (mod && key === 'y') {
+      event.preventDefault()
+      docRef.current?.redo()
+    }
+  }
+
   const commitTitle = () => {
     const next = title.trim() || 'Untitled'
     setTitle(next)
@@ -137,6 +155,8 @@ export function Editor({ documentId, onBack }: { documentId: string; onBack: () 
         <span className={`pill ${status === 'open' ? 'live' : 'waking'}`}>
           <span className="dot"></span>{status === 'open' ? 'Live' : 'Connecting'}
         </span>
+        <button className="iconbtn" onClick={() => docRef.current?.undo()} disabled={!canUndo} type="button" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+        <button className="iconbtn" onClick={() => docRef.current?.redo()} disabled={!canRedo} type="button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button>
         <ThemeToggle />
       </div>
 
@@ -168,6 +188,7 @@ export function Editor({ documentId, onBack }: { documentId: string; onBack: () 
               ref={areaRef}
               value={content}
               onChange={onEdit}
+              onKeyDown={onKeyDown}
               onSelect={sendCaret}
               onKeyUp={sendCaret}
               onClick={sendCaret}
