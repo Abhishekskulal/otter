@@ -30,6 +30,8 @@ export class ClientDocument implements DocumentContext {
   readonly remoteCursors = new Map<string, Cursor>()
   readonly participants = new Map<string, RemoteParticipant>()
   private state: OtState = new Synchronized()
+  /** True from a reconnect until the pending op is transmitted over the live socket, so it is re-sent once. */
+  private needsRetransmit = false
 
   constructor(private readonly options: ClientDocumentOptions) {
     this.content = options.content ?? ''
@@ -52,6 +54,8 @@ export class ClientDocument implements DocumentContext {
   }
 
   send(ops: OperationSequence, baseRevision: number, clientOpId: string): void {
+    // Any live transmission of the pending op satisfies the reconnect retransmit.
+    this.needsRetransmit = false
     this.options.send(ops, baseRevision, clientOpId)
   }
 
@@ -107,8 +111,33 @@ export class ClientDocument implements DocumentContext {
   onServerOp(ops: OperationSequence, revision: number, clientOpId: string): void {
     if (clientOpId === this.state.pendingClientOpId) {
       this.state = this.state.applyAck(this, revision)
-    } else {
+    } else if (revision > this.revision) {
       this.state = this.state.applyRemote(this, ops, revision)
+    } else {
+      // Already applied — a reconnect replay overlapping ops delivered live. Ignore the duplicate.
+      return
+    }
+    this.options.onChange()
+  }
+
+  /** Marks the pending op for retransmission; called when the socket reconnects, before replay. */
+  beginResume(): void {
+    this.needsRetransmit = true
+  }
+
+  /** The revision to catch up from — what the client last saw from the server. */
+  resumePoint(): number {
+    return this.revision
+  }
+
+  /** Replay is complete: re-send the pending op if it was never acknowledged during catch-up. */
+  onResumed(revision: number): void {
+    if (revision > this.revision) {
+      this.revision = revision
+    }
+    if (this.needsRetransmit) {
+      this.state.resend(this)
+      this.needsRetransmit = false
     }
     this.options.onChange()
   }
