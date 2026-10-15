@@ -334,10 +334,17 @@ Update as work completes.
 | M4 | Client three-state machine | **Abhi** | done (Path B) |
 | M5 | Postgres persistence, snapshots, Docker, CI | Split | done (Path B) |
 | M6 | Cursors and presence | **Abhi** | done (Path B) |
-| M7 | Reconnection with op replay | **Abhi** | |
+| M7 | Reconnection with op replay | **Abhi** | done (Path B) |
 | M8 | Multi-instance affinity routing | Optional | |
 
-**Current focus: M7.** M2–M6 are done (Path B). M6 added `Ot.transformPosition`/`Cursor`/`Gravity`
+**Current focus: M8 (optional), else done.** M2–M7 are done (Path B). M7 added reconnection:
+the client auto-reconnects with backoff and sends `resume{afterRevision}`; the server replays
+`log.since` as `op` frames ending in a `resumed` marker (or a full `sync` when the revision
+predates retained history), served statelessly from the log. Correctness rests on two client
+mechanisms — ignoring any op whose revision was already applied (reconnect overlap), and a
+retransmit flag that re-sends the pending op only if replay didn't already ack it. Reconnection
+reuses M5's reload: an evicted session rebuilds from Postgres, so `log.since` and idempotency
+survive. M6 added `Ot.transformPosition`/`Cursor`/`Gravity`
 to `ot-core` (Q6: a separate position transform, not op reuse); the server session tracks
 participants, broadcasts presence, and relays each caret forward-transformed into its current
 revision frame; the client keeps remote carets in its display frame, re-basing them on every
