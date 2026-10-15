@@ -60,7 +60,7 @@ type ServerMessage =
 export interface OtConnectionHandlers {
   onStatus: (status: ConnectionStatus) => void
   onSync: (content: string, revision: number, participants: RemoteParticipant[]) => void
-  onOp: (ops: Operation[], revision: number, clientOpId: string) => void
+  onOp: (ops: Operation[], revision: number, clientOpId: string, authorId: string) => void
   onCursor: (userId: string, anchor: number, head: number) => void
   onPresence: (joined: RemoteParticipant[], left: string[]) => void
   onResumed: (revision: number) => void
@@ -119,7 +119,7 @@ export function openOtConnection(
           handlers.onSync(message.content, message.revision, message.participants)
           break
         case 'op':
-          handlers.onOp(message.ops, message.revision, message.clientOpId)
+          handlers.onOp(message.ops, message.revision, message.clientOpId, message.authorId)
           break
         case 'cursor':
           handlers.onCursor(message.userId, message.anchor, message.head)
