@@ -333,11 +333,16 @@ Update as work completes.
 | M3 | Server control loop, revision log, session registry | **Abhi** | done (Path B) |
 | M4 | Client three-state machine | **Abhi** | done (Path B) |
 | M5 | Postgres persistence, snapshots, Docker, CI | Split | done (Path B) |
-| M6 | Cursors and presence | **Abhi** | |
+| M6 | Cursors and presence | **Abhi** | done (Path B) |
 | M7 | Reconnection with op replay | **Abhi** | |
 | M8 | Multi-instance affinity routing | Optional | |
 
-**Current focus: M6.** M2–M5 are done (Path B). M4 added an `OperationSequence` transform to
+**Current focus: M7.** M2–M6 are done (Path B). M6 added `Ot.transformPosition`/`Cursor`/`Gravity`
+to `ot-core` (Q6: a separate position transform, not op reuse); the server session tracks
+participants, broadcasts presence, and relays each caret forward-transformed into its current
+revision frame; the client keeps remote carets in its display frame, re-basing them on every
+content shift and mapping an incoming caret past its pending ops. M4 added an `OperationSequence`
+transform to
 `ot-core` and switched the wire/envelope to carry a sequence per op (Option A), so the client
 buffer can hold non-mergeable edits. M5 made `DocumentSession` a mailbox + `concatMap` actor that
 persists each operation (synchronous append, §7.4) before broadcasting, rebuilds state from
