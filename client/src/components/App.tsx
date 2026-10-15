@@ -27,6 +27,11 @@ const textBox: React.CSSProperties = {
 }
 
 function wsUrl(): string {
+  // A split deploy (static client on a CDN, backend on Render) sets this to the backend's wss URL.
+  // Local dev and single-origin deploys fall back to the current origin, which Vite proxies to :8080.
+  if (import.meta.env.VITE_WS_URL) {
+    return import.meta.env.VITE_WS_URL
+  }
   const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws'
   return `${scheme}://${window.location.host}/ws`
 }
@@ -120,6 +125,11 @@ export function App() {
       <p style={{ color: '#666' }}>
         Transport: <strong>{status}</strong> · Client state: <strong>{stateName}</strong>
       </p>
+      {status !== 'open' && (
+        <p style={{ background: '#fff4e5', border: '1px solid #f0c893', borderRadius: 6, padding: '8px 12px', fontSize: 13, color: '#8a5a00' }}>
+          Connecting to the backend. The free-tier server sleeps when idle and can take 30–60 seconds to wake — this reconnects automatically.
+        </p>
+      )}
       <PresenceStrip participants={participants} />
       <div style={{ position: 'relative' }}>
         <div ref={mirrorRef} aria-hidden style={{ ...textBox, position: 'absolute', inset: 0, color: 'transparent', pointerEvents: 'none', overflow: 'hidden', borderColor: 'transparent' }}>
