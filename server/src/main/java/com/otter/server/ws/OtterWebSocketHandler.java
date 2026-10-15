@@ -121,6 +121,18 @@ public final class OtterWebSocketHandler implements WebSocketHandler {
                     m.session().moveCursor(authorId, cursor.baseRevision(), cursor.anchor(), cursor.head());
                 }
             }
+            case ClientMessage.Resume resume -> {
+                Membership m = memberships.computeIfAbsent(resume.documentId(), docId -> {
+                    DocumentSession ds = registry.join(docId);
+                    Disposable subscription = ds.broadcast()
+                            .filter(frame -> !isOwnCursor(frame, authorId))
+                            .subscribe(outbound::tryEmitNext);
+                    ds.join(identity);
+                    return new Membership(ds, subscription);
+                });
+                m.session().resume(resume.afterRevision())
+                        .subscribe(frames -> frames.forEach(outbound::tryEmitNext));
+            }
         }
     }
 
