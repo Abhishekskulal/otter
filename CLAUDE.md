@@ -335,9 +335,15 @@ Update as work completes.
 | M5 | Postgres persistence, snapshots, Docker, CI | Split | done (Path B) |
 | M6 | Cursors and presence | **Abhi** | done (Path B) |
 | M7 | Reconnection with op replay | **Abhi** | done (Path B) |
-| M8 | Multi-instance affinity routing | Optional | |
+| M8 | Multi-instance affinity routing | Optional | designed, deferred |
+| M9 | Document management (CRUD, picker, routing) | **Abhi** | done (Path B) |
+| M10 | OT-visibility UI (selections, op log, state panel) + redesign | **Abhi** | |
+| M11 | Undo / redo (selective, per-user) | **Abhi** | |
 
-**Current focus: M8 (optional), else done.** M2–M7 are done (Path B). M7 added reconnection:
+**Current focus: M10.** M9 added document management: a reactive REST API under `api/`
+(create/list/get/rename) with CORS, and a client that routes between a document picker (`/`) and
+the editor (`/d/<id>`), with editable titles — no OT-core changes. M8 is designed but deferred.
+M2–M7 are done (Path B). M7 added reconnection:
 the client auto-reconnects with backoff and sends `resume{afterRevision}`; the server replays
 `log.since` as `op` frames ending in a `resumed` marker (or a full `sync` when the revision
 predates retained history), served statelessly from the log. Correctness rests on two client
