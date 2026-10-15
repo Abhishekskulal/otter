@@ -1,0 +1,26 @@
+name: Property gate (10^6)
+
+# The full-strength OT property run — 1,000,000 tries per property (CLAUDE.md §6).
+# Too slow for every push (~1.5h), so it runs nightly and on demand. A failure here
+# means the engine or the specification is wrong; never weaken the property to pass it.
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  property-gate:
+    name: ot-core properties at 10^6 tries
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+      - run: ./gradlew --no-daemon :ot-core:test -Djqwik.tries.default=1000000
