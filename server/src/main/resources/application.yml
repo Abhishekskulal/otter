@@ -17,7 +17,8 @@ otter:
   snapshot-interval: 500
 
 server:
-  port: 8080
+  # Render (and most PaaS) inject the port to bind via $PORT; default to 8080 locally.
+  port: ${PORT:8080}
 
 management:
   endpoints:
