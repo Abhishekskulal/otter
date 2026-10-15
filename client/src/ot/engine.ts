@@ -139,3 +139,49 @@ export function transformSequence(
 export function compose(sequence: OperationSequence, op: Operation): OperationSequence {
   return [...sequence, op].filter((candidate) => candidate.kind !== 'noop')
 }
+
+export type Gravity = 'left' | 'right'
+
+export interface Cursor {
+  readonly anchor: number
+  readonly head: number
+}
+
+/** Mirrors Ot.transformPosition: shifts a gap position so it points at the same place after `op`. */
+export function transformPosition(position: number, op: Operation, gravity: Gravity): number {
+  switch (op.kind) {
+    case 'noop':
+      return position
+    case 'insert': {
+      const length = op.text.length
+      if (op.position < position) return position + length
+      if (op.position > position) return position
+      return gravity === 'right' ? position + length : position
+    }
+    case 'delete': {
+      const end = op.position + op.length
+      if (position <= op.position) return position
+      if (position >= end) return position - op.length
+      return op.position
+    }
+  }
+}
+
+export function transformPositionSequence(
+  position: number,
+  ops: OperationSequence,
+  gravity: Gravity,
+): number {
+  let result = position
+  for (const op of ops) {
+    result = transformPosition(result, op, gravity)
+  }
+  return result
+}
+
+export function transformCursor(cursor: Cursor, ops: OperationSequence, gravity: Gravity): Cursor {
+  return {
+    anchor: transformPositionSequence(cursor.anchor, ops, gravity),
+    head: transformPositionSequence(cursor.head, ops, gravity),
+  }
+}
