@@ -1,0 +1,25 @@
+# Render blueprint for the otter backend. One instance only until M8 exists: two sequencers for
+# one document means permanent divergence (DESIGN.md §7, "deploy one instance").
+services:
+  - type: web
+    name: otter-server
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /actuator/health
+    # Free plan is a single instance; keep it explicit so no autoscaling is ever added by accident.
+    numInstances: 1
+    envVars:
+      # 512 MB container tuning (DESIGN.md §7): SerialGC beats G1 on one core; skip C2 for fast boot.
+      - key: JAVA_TOOL_OPTIONS
+        value: -XX:MaxRAMPercentage=70 -XX:+UseSerialGC -Xss512k -XX:TieredStopAtLevel=1
+      # Point these at your Neon database. Set them in the Render dashboard, not in git.
+      - key: OTTER_R2DBC_URL
+        sync: false
+      - key: OTTER_JDBC_URL
+        sync: false
+      - key: OTTER_DB_USER
+        sync: false
+      - key: OTTER_DB_PASSWORD
+        sync: false
