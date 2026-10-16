@@ -1,0 +1,17 @@
+# Static deploy of the React client. Set VITE_WS_URL in the Netlify UI to the backend's wss URL
+# (e.g. wss://otter-server.onrender.com/ws) so the built client connects to Render.
+# Cloudflare Pages equivalent: root directory "client", build command "npm run build",
+# output directory "dist", and the same VITE_WS_URL build variable.
+[build]
+  base = "client"
+  command = "npm run build"
+  publish = "client/dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Single-page app: serve index.html for any path.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

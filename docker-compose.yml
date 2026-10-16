@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: otter
+      POSTGRES_USER: otter
+      POSTGRES_PASSWORD: otter
+    ports:
+      - "5432:5432"
+    volumes:
+      - otter-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U otter -d otter"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Inside the compose network the database is reachable as host "postgres".
+      OTTER_R2DBC_URL: r2dbc:postgresql://postgres:5432/otter
+      OTTER_JDBC_URL: jdbc:postgresql://postgres:5432/otter
+      OTTER_DB_USER: otter
+      OTTER_DB_PASSWORD: otter
+    ports:
+      - "8080:8080"
+    profiles:
+      - app
+
+volumes:
+  otter-pg:

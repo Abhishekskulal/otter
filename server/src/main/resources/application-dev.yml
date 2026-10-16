@@ -1,0 +1,4 @@
+logging:
+  level:
+    com.otter: DEBUG
+    org.springframework.web.reactive.socket: DEBUG
