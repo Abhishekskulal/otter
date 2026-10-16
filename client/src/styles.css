@@ -116,12 +116,40 @@ button { font-family: inherit; }
 .banner { background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-fg); border-radius: 10px; padding: 9px 13px; font-size: 13px; display: flex; gap: 9px; align-items: flex-start; }
 .banner .b-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn-fg); margin-top: 6px; flex: none; }
 
-/* document list */
-.doclist { list-style: none; padding: 0; margin: 8px 0; display: flex; flex-direction: column; gap: 8px; }
+/* home screen */
+.home-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 4px; }
+.home-head h2 { font-family: var(--font-display); font-weight: 600; font-size: 22px; letter-spacing: -0.01em; margin: 0; }
+.home-sub { color: var(--faint); font-size: 12.5px; font-family: var(--font-mono); margin-top: 2px; }
+.toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.search { position: relative; flex: 1; min-width: 170px; }
+.search input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px 8px 32px; color: var(--fg); font-size: 14px; outline: none; }
+.search input:focus { border-color: var(--accent); }
+.search .mag { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--faint); font-size: 15px; pointer-events: none; }
+.viewtoggle { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.viewtoggle button { background: var(--surface); border: none; padding: 8px 12px; cursor: pointer; color: var(--muted); font-size: 14px; line-height: 1; }
+.viewtoggle button + button { border-left: 1px solid var(--border); }
+.viewtoggle button.on { background: var(--accent-soft); color: var(--accent-ink); }
+
+.cardgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(208px, 1fr)); gap: 14px; margin-top: 6px; }
+.card { text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; cursor: pointer; display: flex; flex-direction: column; gap: 12px; min-height: 124px; color: var(--fg); transition: border-color .12s ease, transform .12s ease, box-shadow .12s ease; }
+.card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 12px 26px -18px rgba(0,0,0,0.45); }
+.card .glyph { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; color: #fff; font-family: var(--font-display); font-weight: 600; font-size: 15px; }
+.card .card-title { font-size: 15px; font-weight: 500; margin-top: auto; overflow-wrap: anywhere; line-height: 1.35; }
+.card .card-meta { font-family: var(--font-mono); font-size: 11.5px; color: var(--faint); }
+
+/* list view */
+.doclist { list-style: none; padding: 0; margin: 6px 0; display: flex; flex-direction: column; gap: 8px; }
 .doclist button { width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 13px 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--fg); }
 .doclist button:hover { border-color: var(--accent); }
-.doclist .dtitle { font-size: 15px; font-weight: 500; min-width: 0; }
+.doclist .dtitle { font-size: 15px; font-weight: 500; min-width: 0; display: inline-flex; align-items: center; gap: 10px; }
+.doclist .dotmark { width: 9px; height: 9px; border-radius: 3px; flex: none; }
 .doclist .dmeta { font-family: var(--font-mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+.empty-state { text-align: center; padding: 48px 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; border: 1px dashed var(--border-strong); border-radius: 16px; margin-top: 8px; }
+.empty-state .empty-mark { width: 52px; height: 52px; border-radius: 14px; background: var(--accent-soft); color: var(--accent-ink); display: grid; place-items: center; font-size: 24px; }
+.empty-state h3 { margin: 6px 0 0; font-family: var(--font-display); font-weight: 600; font-size: 19px; }
+.empty-state p { margin: 0; color: var(--muted); font-size: 14px; max-width: 42ch; }
+.empty-state .btn-primary { margin-top: 8px; }
 .empty-note { color: var(--muted); }
 .error-note { color: var(--danger); font-size: 14px; }
 
