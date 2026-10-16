@@ -1,3 +1,5 @@
+import { userId } from '../identity'
+
 export interface DocumentSummary {
   readonly id: string
   readonly title: string
@@ -27,7 +29,7 @@ export function createDocument(title?: string): Promise<DocumentSummary> {
   return fetch(`${base}/api/documents`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ title: title ?? '' }),
+    body: JSON.stringify({ title: title ?? '', ownerId: userId() }),
   }).then(json<DocumentSummary>)
 }
 

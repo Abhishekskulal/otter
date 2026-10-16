@@ -1,3 +1,4 @@
+import { displayName, userId } from '../identity'
 import type { RemoteParticipant } from '../ot/clientDocument'
 import type { Operation, OperationSequence } from '../ot/operation'
 
@@ -97,10 +98,10 @@ export function openOtConnection(
       backoff = INITIAL_BACKOFF_MS
       if (firstConnect) {
         firstConnect = false
-        socket.send(JSON.stringify({ type: 'join', documentId }))
+        socket.send(JSON.stringify({ type: 'join', documentId, userId: userId(), displayName: displayName() }))
       } else {
         const afterRevision = handlers.onReconnect()
-        socket.send(JSON.stringify({ type: 'resume', documentId, afterRevision }))
+        socket.send(JSON.stringify({ type: 'resume', documentId, afterRevision, userId: userId(), displayName: displayName() }))
       }
     })
 
