@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createDocument, type DocumentSummary, listDocuments } from '../api/documents'
+import { displayName, setDisplayName } from '../identity'
 import { ThemeToggle } from './theme'
 
 function when(iso: string): string {
@@ -11,6 +12,7 @@ export function DocumentList({ onOpen }: { onOpen: (id: string) => void }) {
   const [docs, setDocs] = useState<DocumentSummary[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [name, setName] = useState(displayName())
 
   useEffect(() => {
     listDocuments()
@@ -34,6 +36,16 @@ export function DocumentList({ onOpen }: { onOpen: (id: string) => void }) {
       <div className="bar">
         <h1 className="brand">otter<small>documents</small></h1>
         <span className="spacer"></span>
+        <label className="whoami">
+          You
+          <input
+            className="name-input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={() => setDisplayName(name)}
+            aria-label="Your display name"
+          />
+        </label>
         <ThemeToggle />
         <button className="btn-primary" onClick={create} disabled={creating} type="button">
           {creating ? 'Creating…' : 'New document'}
