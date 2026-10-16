@@ -1,6 +1,8 @@
 package com.otter.server.ws;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.otter.server.persistence.UserRecord;
+import com.otter.server.persistence.UserRepository;
 import com.otter.server.session.DocumentSession;
 import com.otter.server.session.DocumentSessionRegistry;
 import com.otter.server.session.OperationEnvelope;
@@ -24,24 +26,46 @@ public final class OtterWebSocketHandler implements WebSocketHandler {
     private record Membership(DocumentSession session, Disposable subscription) {
     }
 
-    private final DocumentSessionRegistry registry;
-    private final ObjectMapper objectMapper;
+    /** Per-connection identity; adopted from the client's join/resume so it is stable across reconnects. */
+    private static final class Connection {
+        private volatile ServerMessage.Participant identity;
 
-    public OtterWebSocketHandler(DocumentSessionRegistry registry, ObjectMapper objectMapper) {
-        this.registry = registry;
-        this.objectMapper = objectMapper;
+        Connection(ServerMessage.Participant initial) {
+            this.identity = initial;
+        }
+
+        ServerMessage.Participant identity() {
+            return identity;
+        }
+
+        UUID authorId() {
+            return identity.userId();
+        }
+
+        void adopt(ServerMessage.Participant next) {
+            this.identity = next;
+        }
     }
 
-    /** Distinct colours handed to members in join order; wraps around past the end. */
+    /** Stable colours assigned deterministically by user id, so a returning user keeps their colour. */
     private static final String[] PALETTE = {
             "#e6194B", "#3cb44b", "#4363d8", "#f58231", "#911eb4",
             "#42d4f4", "#f032e6", "#bfef45", "#fabed4", "#469990"
     };
 
+    private final DocumentSessionRegistry registry;
+    private final UserRepository users;
+    private final ObjectMapper objectMapper;
+
+    public OtterWebSocketHandler(DocumentSessionRegistry registry, UserRepository users, ObjectMapper objectMapper) {
+        this.registry = registry;
+        this.users = users;
+        this.objectMapper = objectMapper;
+    }
+
     @Override
     public Mono<Void> handle(WebSocketSession session) {
-        ServerMessage.Participant identity = newIdentity();
-        UUID authorId = identity.userId();
+        Connection conn = new Connection(identityFor(null, null));
         Sinks.Many<ServerMessage> outbound = Sinks.many().unicast().onBackpressureBuffer();
         Map<UUID, Membership> memberships = new ConcurrentHashMap<>();
 
@@ -50,10 +74,10 @@ public final class OtterWebSocketHandler implements WebSocketHandler {
 
         Mono<Void> receive = session.receive()
                 .map(WebSocketMessage::getPayloadAsText)
-                .doOnNext(text -> dispatch(text, identity, outbound, memberships))
+                .doOnNext(text -> dispatch(text, conn, outbound, memberships))
                 .doFinally(signal -> {
                     memberships.forEach((docId, m) -> {
-                        m.session().leave(authorId);
+                        m.session().leave(conn.authorId());
                         m.subscription().dispose();
                         registry.leave(docId);
                     });
@@ -65,16 +89,18 @@ public final class OtterWebSocketHandler implements WebSocketHandler {
         return Mono.zip(send, receive).then();
     }
 
-    private static ServerMessage.Participant newIdentity() {
-        UUID userId = UUID.randomUUID();
-        String shortId = userId.toString().substring(0, 4);
-        String colour = PALETTE[Math.floorMod(userId.hashCode(), PALETTE.length)];
-        return new ServerMessage.Participant(userId, "Anon-" + shortId, colour);
+    /** Builds the participant from the client-supplied id and name, falling back to a fresh anonymous one. */
+    private ServerMessage.Participant identityFor(UUID userId, String displayName) {
+        UUID id = userId != null ? userId : UUID.randomUUID();
+        String colour = PALETTE[Math.floorMod(id.hashCode(), PALETTE.length)];
+        String name = displayName != null && !displayName.isBlank()
+                ? displayName.trim()
+                : "Anon-" + id.toString().substring(0, 4);
+        return new ServerMessage.Participant(id, name, colour);
     }
 
-    private void dispatch(String text, ServerMessage.Participant identity, Sinks.Many<ServerMessage> outbound,
+    private void dispatch(String text, Connection conn, Sinks.Many<ServerMessage> outbound,
             Map<UUID, Membership> memberships) {
-        UUID authorId = identity.userId();
         ClientMessage message;
         try {
             message = objectMapper.readValue(text, ClientMessage.class);
@@ -84,20 +110,14 @@ public final class OtterWebSocketHandler implements WebSocketHandler {
 
         switch (message) {
             case ClientMessage.Join join -> {
-                memberships.computeIfAbsent(join.documentId(), docId -> {
-                    DocumentSession ds = registry.join(docId);
-                    Disposable subscription = ds.broadcast()
-                            .filter(frame -> !isOwnCursor(frame, authorId))
-                            .subscribe(outbound::tryEmitNext);
-                    ds.join(identity);
-                    ds.currentState().subscribe(outbound::tryEmitNext);
-                    return new Membership(ds, subscription);
-                });
+                adopt(conn, join.userId(), join.displayName());
+                join(conn, join.documentId(), outbound, memberships);
+                memberships.get(join.documentId()).session().currentState().subscribe(outbound::tryEmitNext);
             }
             case ClientMessage.Leave leave -> {
                 Membership m = memberships.remove(leave.documentId());
                 if (m != null) {
-                    m.session().leave(authorId);
+                    m.session().leave(conn.authorId());
                     m.subscription().dispose();
                     registry.leave(leave.documentId());
                 }
@@ -110,7 +130,7 @@ public final class OtterWebSocketHandler implements WebSocketHandler {
                 OperationEnvelope envelope = new OperationEnvelope(
                         op.clientOpId(),
                         op.documentId(),
-                        authorId,
+                        conn.authorId(),
                         op.baseRevision(),
                         OperationMapper.toDomain(op.ops()));
                 m.session().submit(envelope).subscribe(outbound::tryEmitNext);
@@ -118,22 +138,38 @@ public final class OtterWebSocketHandler implements WebSocketHandler {
             case ClientMessage.Cursor cursor -> {
                 Membership m = memberships.get(cursor.documentId());
                 if (m != null) {
-                    m.session().moveCursor(authorId, cursor.baseRevision(), cursor.anchor(), cursor.head());
+                    m.session().moveCursor(conn.authorId(), cursor.baseRevision(), cursor.anchor(), cursor.head());
                 }
             }
             case ClientMessage.Resume resume -> {
-                Membership m = memberships.computeIfAbsent(resume.documentId(), docId -> {
-                    DocumentSession ds = registry.join(docId);
-                    Disposable subscription = ds.broadcast()
-                            .filter(frame -> !isOwnCursor(frame, authorId))
-                            .subscribe(outbound::tryEmitNext);
-                    ds.join(identity);
-                    return new Membership(ds, subscription);
-                });
-                m.session().resume(resume.afterRevision())
+                adopt(conn, resume.userId(), resume.displayName());
+                join(conn, resume.documentId(), outbound, memberships);
+                memberships.get(resume.documentId()).session()
+                        .resume(resume.afterRevision())
                         .subscribe(frames -> frames.forEach(outbound::tryEmitNext));
             }
         }
+    }
+
+    private void adopt(Connection conn, UUID userId, String displayName) {
+        conn.adopt(identityFor(userId, displayName));
+        ServerMessage.Participant p = conn.identity();
+        users.upsert(new UserRecord(p.userId(), p.displayName(), p.colour())).subscribe();
+    }
+
+    /** Joins the session for this document once per connection: subscribe, announce presence. */
+    private void join(Connection conn, UUID documentId, Sinks.Many<ServerMessage> outbound,
+            Map<UUID, Membership> memberships) {
+        UUID authorId = conn.authorId();
+        ServerMessage.Participant identity = conn.identity();
+        memberships.computeIfAbsent(documentId, docId -> {
+            DocumentSession ds = registry.join(docId);
+            Disposable subscription = ds.broadcast()
+                    .filter(frame -> !isOwnCursor(frame, authorId))
+                    .subscribe(outbound::tryEmitNext);
+            ds.join(identity);
+            return new Membership(ds, subscription);
+        });
     }
 
     /** A client never needs its own caret echoed back to it. */
