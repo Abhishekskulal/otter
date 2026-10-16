@@ -42,7 +42,18 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-ui); line-height: 1.5; -webkit-font-smoothing: antialiased; }
 button { font-family: inherit; }
-.wrap { max-width: 1040px; margin: 0 auto; padding-inline: 16px; padding-block: 22px 40px; display: flex; flex-direction: column; gap: 16px; }
+html, body { height: 100%; }
+.wrap { max-width: 1040px; min-height: 100vh; box-sizing: border-box; margin: 0 auto; padding-inline: 16px; padding-block: 22px 28px; display: flex; flex-direction: column; gap: 16px; }
+
+/* hero greeting */
+.hero { margin-top: 6px; }
+.hero .greeting { font-family: var(--font-display); font-weight: 600; font-size: clamp(26px, 4.5vw, 38px); letter-spacing: -0.02em; margin: 0; }
+.hero .hero-sub { color: var(--muted); font-size: 15px; line-height: 1.6; margin: 10px 0 0; max-width: 62ch; }
+
+/* footer, pinned to the bottom of the viewport */
+.home-footer { margin-top: auto; padding-top: 18px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-family: var(--font-mono); font-size: 12px; color: var(--faint); }
+.home-footer a { color: var(--accent-ink); text-decoration: none; }
+.home-footer a:hover { text-decoration: underline; }
 
 /* header */
 .bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
@@ -117,9 +128,8 @@ button { font-family: inherit; }
 .banner .b-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn-fg); margin-top: 6px; flex: none; }
 
 /* home screen */
-.home-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 4px; }
-.home-head h2 { font-family: var(--font-display); font-weight: 600; font-size: 22px; letter-spacing: -0.01em; margin: 0; }
-.home-sub { color: var(--faint); font-size: 12.5px; font-family: var(--font-mono); margin-top: 2px; }
+.home-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 2px; }
+.home-sub { color: var(--faint); font-size: 12.5px; font-family: var(--font-mono); }
 .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .search { position: relative; flex: 1; min-width: 170px; }
 .search input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px 8px 32px; color: var(--fg); font-size: 14px; outline: none; }

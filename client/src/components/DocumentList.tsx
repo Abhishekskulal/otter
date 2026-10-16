@@ -28,6 +28,13 @@ function relativeTime(iso: string): string {
   return date.toLocaleDateString()
 }
 
+function greeting(): string {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
+}
+
 function readView(): 'grid' | 'list' {
   try {
     return localStorage.getItem('otter-view') === 'list' ? 'list' : 'grid'
@@ -92,12 +99,17 @@ export function DocumentList({ onOpen }: { onOpen: (id: string) => void }) {
         </button>
       </div>
 
+      <section className="hero">
+        <h2 className="greeting">{greeting()}{name ? `, ${name}` : ''}</h2>
+        <p className="hero-sub">
+          Real-time collaborative editing on a hand-written operational-transformation engine. Create a
+          document and share its link — anyone who opens it edits with you, live, and it all converges.
+        </p>
+      </section>
+
       <div className="home-head">
-        <div>
-          <h2>Your documents</h2>
-          <div className="home-sub">
-            {docs === null ? 'loading…' : `${docs.length} document${docs.length === 1 ? '' : 's'}`}
-          </div>
+        <div className="home-sub">
+          {docs === null ? 'loading…' : `${docs.length} document${docs.length === 1 ? '' : 's'}`}
         </div>
         <div className="toolbar">
           <div className="search">
@@ -153,6 +165,11 @@ export function DocumentList({ onOpen }: { onOpen: (id: string) => void }) {
           ))}
         </ul>
       )}
+
+      <footer className="home-footer">
+        <span>otter · collaborative plain-text editing on operational transformation</span>
+        <a href="https://github.com/Abhishekskulal/otter" target="_blank" rel="noreferrer">GitHub ↗</a>
+      </footer>
     </div>
   )
 }
