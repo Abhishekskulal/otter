@@ -29,7 +29,7 @@ public class DocumentController {
         this.documents = documents;
     }
 
-    public record CreateRequest(String title) {
+    public record CreateRequest(String title, UUID ownerId) {
     }
 
     public record RenameRequest(String title) {
@@ -38,7 +38,8 @@ public class DocumentController {
     @PostMapping
     public Mono<DocumentSummary> create(@RequestBody(required = false) CreateRequest body) {
         UUID id = UUID.randomUUID();
-        return documents.create(id, titleOrDefault(body == null ? null : body.title()), ANONYMOUS_OWNER)
+        UUID owner = body != null && body.ownerId() != null ? body.ownerId() : ANONYMOUS_OWNER;
+        return documents.create(id, titleOrDefault(body == null ? null : body.title()), owner)
                 .then(documents.findById(id));
     }
 

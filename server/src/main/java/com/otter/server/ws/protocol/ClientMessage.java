@@ -19,11 +19,12 @@ public sealed interface ClientMessage
 
     UUID documentId();
 
-    record Join(UUID documentId) implements ClientMessage {
+    record Join(UUID documentId, UUID userId, String displayName) implements ClientMessage {
     }
 
     /** Reconnect catch-up request: replay everything committed after {@code afterRevision}. */
-    record Resume(UUID documentId, long afterRevision) implements ClientMessage {
+    record Resume(UUID documentId, long afterRevision, UUID userId, String displayName)
+            implements ClientMessage {
     }
 
     record Leave(UUID documentId) implements ClientMessage {
