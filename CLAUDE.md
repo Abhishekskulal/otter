@@ -339,8 +339,14 @@ Update as work completes.
 | M9 | Document management (CRUD, picker, routing) | **Abhi** | done (Path B) |
 | M10 | OT-visibility UI (selections, op log, state panel) + redesign | **Abhi** | done (Path B) |
 | M11 | Undo / redo (selective, per-user) | **Abhi** | done (Path B) |
+| M12 | Persistent user identity (users table, ownership) | **Abhi** | done (Path B) |
 
-**Current focus: deploy + demo (M1–M11 done; M8 optional).** M11 added selective (per-user)
+**Current focus: deploy + demo (M1–M12 done; M8 optional).** M12 added persistent pseudonymous
+identity: a `users` table (V2 migration) + `UserRepository`; the browser keeps a stable `userId` and
+name in localStorage and sends them on join/resume; the handler adopts that identity (deterministic
+colour by id), upserts the user, and documents carry a real `owner_id`. No credentials — real auth
+is still future (DESIGN.md §3.2). The OT core, session loop, and client state machine were
+untouched. M11 added selective (per-user)
 undo/redo: `Ot.invert`/`invertSequence` in `ot-core` (inverting a delete needs the removed text, so
 inversion takes the pre-state), and client undo/redo stacks of inverse sequences kept in the live
 frame — transformed past every applied op via the renamed `onContentShift` hook (shared with
