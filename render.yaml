@@ -5,6 +5,7 @@ services:
     name: otter-server
     runtime: docker
     plan: free
+    region: singapore  # sit next to the Neon database (ap-southeast-1) — DB write is on every keystroke
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /actuator/health
