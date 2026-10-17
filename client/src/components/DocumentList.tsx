@@ -81,7 +81,7 @@ export function DocumentList({ onOpen }: { onOpen: (id: string) => void }) {
   return (
     <div className="wrap">
       <div className="bar">
-        <h1 className="brand">otter<small>collaborative editor</small></h1>
+        <h1 className="brand"><img className="brand-mark" src="/favicon.svg" alt="" width="30" height="30" />otter<small>collaborative editor</small></h1>
         <span className="spacer"></span>
         <label className="whoami">
           You

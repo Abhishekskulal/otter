@@ -57,7 +57,8 @@ html, body { height: 100%; }
 
 /* header */
 .bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-.bar .brand { font-family: var(--font-display); font-weight: 600; font-size: 26px; letter-spacing: -0.02em; margin: 0; }
+.bar .brand { font-family: var(--font-display); font-weight: 600; font-size: 26px; letter-spacing: -0.02em; margin: 0; display: inline-flex; align-items: center; }
+.brand-mark { width: 30px; height: 30px; border-radius: 7px; margin-right: 10px; }
 .bar .brand small { font-family: var(--font-ui); font-weight: 400; font-size: 13px; color: var(--muted); margin-left: 8px; letter-spacing: 0; }
 .bar .spacer { flex: 1; }
 .linkbtn { background: none; border: none; color: var(--accent); cursor: pointer; padding: 0; font-size: 14px; }

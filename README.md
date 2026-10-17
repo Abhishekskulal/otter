@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo.svg" alt="otter" width="96" height="96" /></p>
+
 # otter
 
 A real-time collaborative plain-text editor built on a **hand-written Operational Transformation
