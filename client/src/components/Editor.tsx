@@ -51,6 +51,7 @@ export function Editor({ documentId, onBack }: { documentId: string; onBack: () 
   const [title, setTitle] = useState('Untitled')
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
+  const [waking, setWaking] = useState(false)
   const docRef = useRef<ClientDocument | null>(null)
   const areaRef = useRef<HTMLTextAreaElement | null>(null)
   const mirrorRef = useRef<HTMLDivElement | null>(null)
@@ -58,6 +59,17 @@ export function Editor({ documentId, onBack }: { documentId: string; onBack: () 
   useEffect(() => {
     getDocument(documentId).then((d) => setTitle(d.title)).catch(() => setTitle('Untitled'))
   }, [documentId])
+
+  // Only surface the "waking" banner for a genuinely slow connect (a cold backend), not the
+  // sub-second reconnect that happens every time a document opens on a warm backend.
+  useEffect(() => {
+    if (status === 'open') {
+      setWaking(false)
+      return
+    }
+    const timer = setTimeout(() => setWaking(true), 2500)
+    return () => clearTimeout(timer)
+  }, [status])
 
   useEffect(() => {
     let conn: OtConnection | null = null
@@ -169,7 +181,7 @@ export function Editor({ documentId, onBack }: { documentId: string; onBack: () 
         aria-label="Document title"
       />
 
-      {status !== 'open' && (
+      {waking && (
         <div className="banner">
           <span className="b-dot"></span>
           <span>Waking the free-tier backend — this can take 30–60 seconds and reconnects on its own.</span>
