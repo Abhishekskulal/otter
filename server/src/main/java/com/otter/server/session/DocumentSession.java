@@ -14,6 +14,7 @@ import com.otter.server.ws.protocol.OperationMapper;
 import com.otter.server.ws.protocol.ServerMessage;
 import com.otter.server.ws.protocol.ServerMessage.Participant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +72,8 @@ public final class DocumentSession {
 
     private final RevisionLog log = new RevisionLog();
     private final Map<UUID, Participant> participants = new LinkedHashMap<>();
+    /** Live connections per user, so presence announces a join on the first and a leave on the last. */
+    private final Map<UUID, Integer> connectionCounts = new HashMap<>();
     private final Sinks.Many<Command> mailbox = Sinks.many().unicast().onBackpressureBuffer();
     private final Sinks.Many<ServerMessage> broadcast = Sinks.many().multicast().onBackpressureBuffer();
     private final Disposable pump;
@@ -173,15 +176,25 @@ public final class DocumentSession {
                 yield Mono.empty();
             }
             case MemberJoined joined -> {
-                participants.put(joined.participant().userId(), joined.participant());
-                broadcast.tryEmitNext(new ServerMessage.Presence(
-                        documentId, List.of(joined.participant()), List.of()));
+                UUID userId = joined.participant().userId();
+                participants.put(userId, joined.participant());
+                // Announce the join only when this user's first connection arrives; later tabs are silent.
+                if (connectionCounts.merge(userId, 1, Integer::sum) == 1) {
+                    broadcast.tryEmitNext(new ServerMessage.Presence(
+                            documentId, List.of(joined.participant()), List.of()));
+                }
                 yield Mono.empty();
             }
             case MemberLeft left -> {
-                if (participants.remove(left.userId()) != null) {
+                Integer count = connectionCounts.get(left.userId());
+                if (count != null && count <= 1) {
+                    // Last connection for this user is gone — now they have truly left.
+                    connectionCounts.remove(left.userId());
+                    participants.remove(left.userId());
                     broadcast.tryEmitNext(new ServerMessage.Presence(
                             documentId, List.of(), List.of(left.userId())));
+                } else if (count != null) {
+                    connectionCounts.put(left.userId(), count - 1);
                 }
                 yield Mono.empty();
             }
