@@ -101,8 +101,10 @@ The hosted target is a static client on a CDN plus one backend instance, backed 
    - `OTTER_R2DBC_URL` — `r2dbc:postgresql://<host>/<db>?sslmode=require`
    - `OTTER_JDBC_URL` — `jdbc:postgresql://<host>/<db>?sslmode=require`
    - `OTTER_DB_USER`, `OTTER_DB_PASSWORD`
-3. **Client — Netlify or Cloudflare Pages.** `netlify.toml` is included. Set `VITE_WS_URL` to
-   `wss://<your-service>.onrender.com/ws` so the built client connects to the backend.
+3. **Client — Netlify or Cloudflare Pages.** `netlify.toml` is included. Set two build env vars so
+   the built client reaches the backend:
+   - `VITE_WS_URL` = `wss://<your-service>.onrender.com/ws`
+   - `VITE_API_URL` = `https://<your-service>.onrender.com`
 4. **Keep-warm (optional).** Set the repo variable `HEALTHCHECK_URL` to the backend's
    `/actuator/health`; the `keepwarm` workflow pings it every 10 minutes.
 

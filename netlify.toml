@@ -1,7 +1,10 @@
-# Static deploy of the React client. Set VITE_WS_URL in the Netlify UI to the backend's wss URL
-# (e.g. wss://otter-server.onrender.com/ws) so the built client connects to Render.
+# Static deploy of the React client. Set TWO build env vars in the Netlify UI so the built client
+# reaches the backend on Render:
+#   VITE_WS_URL  = wss://<your-service>.onrender.com/ws     (WebSocket)
+#   VITE_API_URL = https://<your-service>.onrender.com      (REST /api — without it, document
+#                                                            loading hits the CDN and 404s)
 # Cloudflare Pages equivalent: root directory "client", build command "npm run build",
-# output directory "dist", and the same VITE_WS_URL build variable.
+# output directory "dist", and the same two build variables.
 [build]
   base = "client"
   command = "npm run build"
