@@ -6,6 +6,9 @@ edits are transformed so every client converges on byte-identical text.
 
 Java 21 · Spring WebFlux (reactive, raw WebSockets) · PostgreSQL (R2DBC) · React + TypeScript.
 
+**Live demo: https://otter-live.netlify.app** — create a document and share its link to edit together.
+(The free backend sleeps when idle, so the first load may take ~30–60s to wake.)
+
 <!-- Record this: two browser windows typing into the same document at the same time. -->
 <!-- See "Recording the demo" below. -->
 ![Two windows editing one document and converging](docs/demo.gif)
@@ -105,8 +108,9 @@ The hosted target is a static client on a CDN plus one backend instance, backed 
    the built client reaches the backend:
    - `VITE_WS_URL` = `wss://<your-service>.onrender.com/ws`
    - `VITE_API_URL` = `https://<your-service>.onrender.com`
-4. **Keep-warm (optional).** Set the repo variable `HEALTHCHECK_URL` to the backend's
-   `/actuator/health`; the `keepwarm` workflow pings it every 10 minutes.
+4. **Keep-warm (optional).** In GitHub → repo **Settings → Secrets and variables → Actions →
+   Variables**, add `HEALTHCHECK_URL = https://otter-server.onrender.com/actuator/health`; the
+   `keepwarm` workflow then pings it every 10 minutes so the backend stays awake.
 
 **Cold starts.** A free Render service sleeps after 15 minutes idle and takes 30–60s to wake. The
 client shows a banner and reconnects automatically — but the demo GIF above is what most visitors
