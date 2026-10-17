@@ -6,8 +6,8 @@
 # Cloudflare Pages equivalent: root directory "client", build command "npm run build",
 # output directory "dist", and the same two build variables.
 [build]
-  base = "client"
-  command = "npm run build"
+  # No base dir: publish is relative to the repo root, and we build the client subproject explicitly.
+  command = "npm --prefix client install && npm --prefix client run build"
   publish = "client/dist"
 
 [build.environment]
