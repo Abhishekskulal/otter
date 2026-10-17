@@ -68,6 +68,32 @@ class CursorPresenceTest {
         assertThat(sync.participants()).isEmpty();
     }
 
+    @Test
+    void presenceSurvivesUntilTheUsersLastConnectionLeaves() {
+        DocumentSession doc = newSession();
+        List<ServerMessage> seen = subscribe(doc);
+        ServerMessage.Participant member =
+                new ServerMessage.Participant(UUID.randomUUID(), "Anon-2tab", "#f58231");
+
+        doc.join(member); // first connection (e.g. tab A)
+        doc.join(member); // second connection, same user (tab B)
+        doc.leave(member.userId()); // tab B closes
+        barrier(doc);
+
+        // Still present after one of two connections leaves, and the join was announced only once.
+        assertThat(((ServerMessage.Sync) doc.currentState().block()).participants()).containsExactly(member);
+        assertThat(seen.stream().filter(m -> m instanceof ServerMessage.Presence p && !p.joined().isEmpty()).count())
+                .isEqualTo(1);
+        assertThat(seen.stream().anyMatch(m -> m instanceof ServerMessage.Presence p && !p.left().isEmpty()))
+                .isFalse();
+
+        doc.leave(member.userId()); // last connection closes
+        barrier(doc);
+
+        assertThat(last(seen, ServerMessage.Presence.class).left()).containsExactly(member.userId());
+        assertThat(((ServerMessage.Sync) doc.currentState().block()).participants()).isEmpty();
+    }
+
     private static List<ServerMessage> subscribe(DocumentSession doc) {
         List<ServerMessage> received = new CopyOnWriteArrayList<>();
         doc.broadcast().subscribe(received::add);
